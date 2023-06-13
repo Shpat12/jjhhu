@@ -1,0 +1,1163 @@
+//@version=5
+
+indicator('TDI - Traders Dynamic Index + RSI Divergences + Buy/Sell Signals', shorttitle='TDI + RSI Div', overlay = true)
+
+
+
+rsiPeriod = input.int(14, minval=1, title='RSI Period')
+
+bandLength = input.int(34, minval=1, title='Band Length')
+
+lengthrsipl = input.int(7, minval=0, title='Fast MA on RSI')
+
+lengthtradesl = input.int(2, minval=1, title='Slow MA on RSI')
+
+src1 = close  // Source of Calculations (Close of Bar)
+
+r = ta.rsi(src1, rsiPeriod)  // RSI of Close
+
+ma = ta.sma(r, bandLength)  // Moving Average of RSI [current]
+
+offs = 1.6185 * ta.stdev(r, bandLength)  // Offset
+
+up = ma + offs  // Upper Bands
+
+dn = ma - offs  // Lower Bands
+
+mid = (up + dn) / 2  // Average of Upper and Lower Bands
+
+mbb = ta.sma(r, lengthrsipl)  // Moving Average of RSI 2 bars back
+
+mab = ta.sma(r, lengthtradesl)  // Moving Average of RSI 7 bars back
+
+
+
+
+
+hline(30, color=color.red, linewidth=1, linestyle=hline.style_dotted)
+
+hline(50, color=color.orange, linewidth=1, linestyle=hline.style_dotted)
+
+hline(70, color=color.green, linewidth=1, linestyle=hline.style_dotted)
+
+
+
+// Plot the TDI
+
+upl = plot(up, color=color.new(#12bcc9, 60), title='VB Channel High', linewidth=2)
+
+dnl = plot(dn, color=color.new(#12bcc9, 60), title='VB Channel Low', linewidth=2)
+
+midl = plot(mid, color=color.new(color.orange, 40), linewidth=2, title='MBL')
+
+mabl = plot(mab, color=color.new(color.lime, 30), linewidth=2, title='RSI PL')
+
+mbbl = plot(mbb, color=color.new(color.red, 60), linewidth=2, title='TSL Signal')
+
+
+
+//
+
+//create RSI TSL cloud to indicate trend direction.
+
+fill(mabl, mbbl, color=mab > mbb ? color.green : color.red, transp=80)
+
+// fill(upl, midl, color.green, transp=95)                                   
+
+// fill(midl, dnl, color.red, transp=95)        
+
+
+
+//long/short labels
+
+
+
+long1 = ta.crossover(mab, mbb) and mbb > mid and mbb > 50
+
+short1 = ta.crossunder(mab, mbb) and mbb < mid and mbb < 50
+
+
+
+plotshape(long1, style=shape.labelup, location=location.bottom, color=color.new(color.lime, 0), size=size.tiny, editable=true)
+
+plotshape(short1, style=shape.labeldown, location=location.top, color=color.new(color.red, 0), size=size.tiny, editable=true)
+
+
+
+alertcondition(long1, title='Long', message='Crossover')
+
+alertcondition(short1, title='Short', message='Crossunder')
+
+
+
+best_setup = ta.crossover(mab, mid)
+
+alertcondition(best_setup, title='RSI Crosses Yellow', message='rsi crosses mid')
+
+
+
+scalp = mab > mid
+
+bgcolor(scalp ? color.lime : na, transp=95)
+
+
+
+
+
+// Divergences //
+
+len = input.int(title='RSI Period', minval=1, defval=14)
+
+src = input(title='RSI Source', defval=close)
+
+lbR = input(title='Pivot Lookback Right', defval=5)
+
+lbL = input(title='Pivot Lookback Left', defval=5)
+
+rangeUpper = input(title='Max of Lookback Range', defval=60)
+
+rangeLower = input(title='Min of Lookback Range', defval=5)
+
+plotBull = input(title='Plot Bullish', defval=true)
+
+plotHiddenBull = input(title='Plot Hidden Bullish', defval=false)
+
+plotBear = input(title='Plot Bearish', defval=true)
+
+plotHiddenBear = input(title='Plot Hidden Bearish', defval=false)
+
+bearColor = color.red
+
+bullColor = color.green
+
+hiddenBullColor = color.new(color.green, 80)
+
+hiddenBearColor = color.new(color.red, 80)
+
+textColor = color.white
+
+noneColor = color.new(color.white, 100)
+
+osc = ta.rsi(src, len)
+
+
+
+// // plot(osc, title="RSI", linewidth=2, color=#8D1699)
+
+// hline(50, title="Middle Line", linewidth=2, linestyle=hline.style_dotted)
+
+// obLevel = hline(70, title="Overbought", linewidth=2, linestyle=hline.style_dotted)
+
+// osLevel = hline(30, title="Oversold", linewidth=2, linestyle=hline.style_dotted)
+
+
+
+plFound = na(ta.pivotlow(osc, lbL, lbR)) ? false : true
+
+phFound = na(ta.pivothigh(osc, lbL, lbR)) ? false : true
+
+_inRange(cond) =>
+
+    bars = ta.barssince(cond == true)
+
+    rangeLower <= bars and bars <= rangeUpper
+
+
+
+
+
+//------------------------------------------------------------------------------
+
+// Regular Bullish
+
+// Osc: Higher Low
+
+oscHL = osc[lbR] > ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+
+
+
+// Price: Lower Low
+
+priceLL = low[lbR] < ta.valuewhen(plFound, low[lbR], 1)
+
+bullCond = plotBull and priceLL and oscHL and plFound
+
+
+
+plot(plFound ? osc[lbR] : na, offset=-lbR, title='Regular Bullish', linewidth=2, color=bullCond ? bullColor : noneColor, transp=0)
+
+
+
+plotshape(bullCond ? osc[lbR] : na, offset=-lbR, title='Regular Bullish Label', text=' Bull ', style=shape.labelup, location=location.absolute, color=color.new(bullColor, 0), textcolor=color.new(textColor, 0))
+
+
+
+//------------------------------------------------------------------------------
+
+// Hidden Bullish
+
+// Osc: Lower Low
+
+
+
+oscLL = osc[lbR] < ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+
+
+
+// Price: Higher Low
+
+
+
+priceHL = low[lbR] > ta.valuewhen(plFound, low[lbR], 1)
+
+hiddenBullCond = plotHiddenBull and priceHL and oscLL and plFound
+
+
+
+plot(plFound ? osc[lbR] : na, offset=-lbR, title='Hidden Bullish', linewidth=2, color=hiddenBullCond ? hiddenBullColor : noneColor, transp=0)
+
+
+
+plotshape(hiddenBullCond ? osc[lbR] : na, offset=-lbR, title='Hidden Bullish Label', text=' H Bull ', style=shape.labelup, location=location.absolute, color=color.new(bullColor, 0), textcolor=color.new(textColor, 0))
+
+
+
+//------------------------------------------------------------------------------
+
+// Regular Bearish
+
+// Osc: Lower High
+
+
+
+oscLH = osc[lbR] < ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+
+
+
+// Price: Higher High
+
+
+
+priceHH = high[lbR] > ta.valuewhen(phFound, high[lbR], 1)
+
+
+
+bearCond = plotBear and priceHH and oscLH and phFound
+
+
+
+plot(phFound ? osc[lbR] : na, offset=-lbR, title='Regular Bearish', linewidth=2, color=bearCond ? bearColor : noneColor, transp=0)
+
+
+
+plotshape(bearCond ? osc[lbR] : na, offset=-lbR, title='Regular Bearish Label', text=' Bear ', style=shape.labeldown, location=location.absolute, color=color.new(bearColor, 0), textcolor=color.new(textColor, 0))
+
+
+
+//------------------------------------------------------------------------------
+
+// Hidden Bearish
+
+// Osc: Higher High
+
+
+
+oscHH = osc[lbR] > ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+
+
+
+// Price: Lower High
+
+
+
+priceLH = high[lbR] < ta.valuewhen(phFound, high[lbR], 1)
+
+
+
+hiddenBearCond = plotHiddenBear and priceLH and oscHH and phFound
+
+
+
+plot(phFound ? osc[lbR] : na, offset=-lbR, title='Hidden Bearish', linewidth=2, color=hiddenBearCond ? hiddenBearColor : noneColor, transp=0)
+
+
+
+plotshape(hiddenBearCond ? osc[lbR] : na, offset=-lbR, title='Hidden Bearish Label', text=' H Bear ', style=shape.labeldown, location=location.absolute, color=color.new(bearColor, 0), textcolor=color.new(textColor, 0))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ~~ Tooltips {
+
+string t1 = "Set the pivot period"
+
+string t2 = "Set the response period. A low value returns a short-term structure and a high value returns a long-term structure. If you disable this option the pivot length above will be used."
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Inputs {
+
+prd    = input.int(20,minval=1,title="Structure Period",tooltip=t1)
+
+s1     = input.bool(true,title="Structure Response  ", inline="resp")
+
+resp   = input.int(7,minval=1,title="",inline="resp",tooltip=t2)
+
+bull   = input.bool(true,"Bullish Structure     ",inline="Bullish"), bull2 = input.color(color.rgb(8, 236, 126),"",inline="Bullish"), bull3 = input.color(color.rgb(8, 236, 126),"",inline="Bullish")
+
+bear   = input.bool(true,"Bearish Structure    ",inline="Bearish"), bear2 = input.color(color.rgb(255, 34, 34),"",inline="Bearish"), bear3 = input.color(color.rgb(255, 34, 34),"",inline="Bearish")
+
+showPD = input.bool(true,"Premium & Discount",inline="pd"), prem = input.color(color.new(color.rgb(255, 34, 34),80),"",inline="pd"), disc = input.color(color.new(color.rgb(8, 236, 126),80),"",inline="pd")
+
+hlloc  = input.string("Right","", options=["Left","Right"],inline="pd")
+
+var bool [] alert_bool  = array.from(
+
+ input.bool(true,title="Ticker ID",group="Any alert() function call"),
+
+ input.bool(true,title="Timeframe",group="Any alert() function call"),
+
+ input.bool(true,title="Probability Percentage",group="Any alert() function call"))
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Variables {
+
+b       = bar_index
+
+var Up  = float(na)
+
+var Dn  = float(na)
+
+var iUp = int(na)
+
+var iDn = int(na)
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Matrix & Array {
+
+var vals          = matrix.new<float>(9,4,0.0)
+
+var string [] txt = array.new<string>(2,"")
+
+var tbl           = matrix.new<table>(1,1,table.new(position.top_right,2,3,
+
+ frame_color      =color.new(color.gray,50),frame_width=3,
+
+ border_color     =chart.bg_color,border_width=-2))
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Functions {
+
+//Labels
+
+CreateLabel(x,y,txt,col,z)=>
+
+    label.new(x,y,txt,textcolor=col,style=z?label.style_label_down:label.style_label_up,color=color(na))
+
+//Lines
+
+CreateLine(x1,x2,y,col)=>
+
+    line.new(x1,x2,b,y,color=col)
+
+//Current
+
+Current(v)=>
+
+    str = ""
+
+    val1 = float(na)
+
+    val2 = float(na)
+
+    if v>=0
+
+        if v==1
+
+            str  := "SMS: "
+
+            val1 := matrix.get(vals,0,1)
+
+            val2 := matrix.get(vals,0,3) 
+
+        else if v==2
+
+            str  := "BMS: "
+
+            val1 := matrix.get(vals,1,1)
+
+            val2 := matrix.get(vals,1,3) 
+
+        else if v>2
+
+            str  := "BMS: "
+
+            val1 := matrix.get(vals,2,1)
+
+            val2 := matrix.get(vals,2,3) 
+
+    else if v<=0
+
+        if v==-1
+
+            str  := "SMS: "
+
+            val1 := matrix.get(vals,3,1)
+
+            val2 := matrix.get(vals,3,3) 
+
+        else if v==-2
+
+            str  := "BMS: "
+
+            val1 := matrix.get(vals,4,1)
+
+            val2 := matrix.get(vals,4,3) 
+
+        else if v<-2
+
+            str  := "BMS: "
+
+            val1 := matrix.get(vals,5,1)
+
+            val2 := matrix.get(vals,5,3)
+
+    [str,val1,val2]
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Pivots {
+
+Up   := math.max(Up[1],high)
+
+Dn   := math.min(Dn[1],low)
+
+pvtHi = ta.pivothigh(high,prd,prd)
+
+pvtLo = ta.pivotlow(low,prd,prd)
+
+if pvtHi
+
+    Up := pvtHi
+
+if pvtLo
+
+    Dn := pvtLo
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Structure {
+
+var pos = 0
+
+if Up>Up[1]
+
+    iUp := b
+
+    centerBull = math.round(math.avg(iUp[1],b))
+
+    if pos<=0
+
+        if bull
+
+            CreateLabel(centerBull,Up[1],"CHoCH",bull3,true)
+
+            CreateLine(iUp[1],Up[1],Up[1],bull2)
+
+        pos := 1
+
+        matrix.set(vals,6,0,matrix.get(vals,6,0)+1)
+
+    else if pos==1 and Up>Up[1] and Up[1]==Up[s1?resp:prd]
+
+        if bull
+
+            CreateLabel(centerBull,Up[1],"SMS",bull3,true)
+
+            CreateLine(iUp[1],Up[1],Up[1],bull2)
+
+        pos := 2
+
+        matrix.set(vals,6,1,matrix.get(vals,6,1)+1)
+
+    else if pos>1 and Up>Up[1] and Up[1]==Up[s1?resp:prd]
+
+        if bull
+
+            CreateLabel(centerBull,Up[1],"BMS",bull3,true)
+
+            CreateLine(iUp[1],Up[1],Up[1],bull2)
+
+        pos := pos + 1
+
+        matrix.set(vals,6,2,matrix.get(vals,6,2)+1)
+
+else if Up<Up[1]
+
+    iUp := b-prd
+
+if Dn<Dn[1]
+
+    iDn := b
+
+    centerBear = math.round(math.avg(iDn[1],b))
+
+    if pos>=0
+
+        if bear
+
+            CreateLabel(centerBear,Dn[1],"CHoCH",bear3,false)
+
+            CreateLine(iDn[1],Dn[1],Dn[1],bear2)
+
+        pos := -1
+
+        matrix.set(vals,7,0,matrix.get(vals,7,0)+1)
+
+    else if pos==-1 and Dn<Dn[1] and Dn[1]==Dn[s1?resp:prd]
+
+        if bear
+
+            CreateLabel(centerBear,Dn[1],"SMS",bear3,false)
+
+            CreateLine(iDn[1],Dn[1],Dn[1],bear2)
+
+        pos := -2
+
+        matrix.set(vals,7,1,matrix.get(vals,7,1)+1)
+
+    else if pos<-1 and Dn<Dn[1] and Dn[1]==Dn[s1?resp:prd]
+
+        if bear
+
+            CreateLabel(centerBear,Dn[1],"BMS",bear3,false)
+
+            CreateLine(iDn[1],Dn[1],Dn[1],bear2)
+
+        pos := pos - 1
+
+        matrix.set(vals,7,2,matrix.get(vals,7,2)+1)
+
+else if Dn>Dn[1]
+
+    iDn := b-prd
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Probability Calculation {
+
+if ta.change(pos)
+
+    //Results
+
+    if pos>0 and pos[1]>0 or pos<0 and pos[1]<0
+
+        if  matrix.get(vals,8,0)<matrix.get(vals,8,1)
+
+            matrix.set(vals,8,2,matrix.get(vals,8,2)+1)
+
+        else
+
+            matrix.set(vals,8,3,matrix.get(vals,8,3)+1)
+
+    else
+
+        if  matrix.get(vals,8,0)>matrix.get(vals,8,1)
+
+            matrix.set(vals,8,2,matrix.get(vals,8,2)+1)
+
+        else
+
+            matrix.set(vals,8,3,matrix.get(vals,8,3)+1)
+
+
+
+    //Score Calulation
+
+    //Variables
+
+    buC0 = matrix.get(vals,0,0)
+
+    buC1 = matrix.get(vals,0,2)
+
+    buS0 = matrix.get(vals,1,0)
+
+    buS1 = matrix.get(vals,1,2)
+
+    buB0 = matrix.get(vals,2,0)
+
+    buB1 = matrix.get(vals,2,2)
+
+    beC0 = matrix.get(vals,3,0)
+
+    beC1 = matrix.get(vals,3,2)
+
+    beS0 = matrix.get(vals,4,0)
+
+    beS1 = matrix.get(vals,4,2)
+
+    beB0 = matrix.get(vals,5,0)
+
+    beB1 = matrix.get(vals,5,2)
+
+    tbuC = matrix.get(vals,6,0)
+
+    tbuS = matrix.get(vals,6,1)
+
+    tbuB = matrix.get(vals,6,2)
+
+    tbeC = matrix.get(vals,7,0)
+
+    tbeS = matrix.get(vals,7,1)
+
+    tbeB = matrix.get(vals,7,2)
+
+
+
+    //Bull
+
+    if (pos[1]==1 or pos[1]==0) and pos<0
+
+        matrix.set(vals,0,0,buC0+1)
+
+        matrix.set(vals,0,1,math.round(((buC0+1)/tbuC)*100,2))
+
+    if (pos[1]==1 or pos[1]==0) and pos==2
+
+        matrix.set(vals,0,2,buC1+1)
+
+        matrix.set(vals,0,3,math.round(((buC1+1)/tbuC)*100,2))
+
+    if pos[1]==2 and pos<0
+
+        matrix.set(vals,1,0,buS0+1)
+
+        matrix.set(vals,1,1,math.round(((buS0+1)/tbuS)*100,2))
+
+    if pos[1]==2 and pos>2
+
+        matrix.set(vals,1,2,buS1+1)
+
+        matrix.set(vals,1,3,math.round(((buS1+1)/tbuS)*100,2))
+
+    if pos[1]>2 and pos<0
+
+        matrix.set(vals,2,0,buB0+1)
+
+        matrix.set(vals,2,1,math.round(((buB0+1)/tbuB)*100,2))
+
+    if pos[1]>2 and pos>pos[1]
+
+        matrix.set(vals,2,2,buB1+1)
+
+        matrix.set(vals,2,3,math.round(((buB1+1)/tbuB)*100,2))
+
+    //Bear
+
+    if (pos[1]==-1 or pos[1]==0) and pos>0
+
+        matrix.set(vals,3,0,beC0+1)
+
+        matrix.set(vals,3,1,math.round(((beC0+1)/tbeC)*100,2))
+
+    if (pos[1]==-1 or pos[1]==0) and pos==-2
+
+        matrix.set(vals,3,2,beC1+1)
+
+        matrix.set(vals,3,3,math.round(((beC1+1)/tbeC)*100,2))
+
+    if pos[1]==-2 and pos>0
+
+        matrix.set(vals,4,0,beS0+1)
+
+        matrix.set(vals,4,1,math.round(((beS0+1)/tbeS)*100,2))
+
+    if pos[1]==-2 and pos<-2
+
+        matrix.set(vals,4,2,beS1+1)
+
+        matrix.set(vals,4,3,math.round(((beS1+1)/tbeS)*100,2))
+
+    if pos[1]<-2 and pos>0
+
+        matrix.set(vals,5,0,beB0+1)
+
+        matrix.set(vals,5,1,math.round(((beB0+1)/tbeB)*100,2))
+
+    if pos[1]<-2 and pos<pos[1]
+
+        matrix.set(vals,5,2,beB1+1)
+
+        matrix.set(vals,5,3,math.round(((beB1+1)/tbeB)*100,2))
+
+    [str,val1,val2] = Current(pos)
+
+    array.set(txt,0,"CHoCH: "+str.tostring(val1,format.percent))
+
+    array.set(txt,1,str+str.tostring(val2,format.percent))
+
+    matrix.set(vals,8,0,val1)
+
+    matrix.set(vals,8,1,val2)
+
+    //Alerts
+
+    if array.includes(alert_bool,true)
+
+        st1 = syminfo.ticker
+
+        st2 = timeframe.period 
+
+        st3 = str.tostring(array.join(txt,'\n'))
+
+        string [] str_vals = array.from(st1,st2,st3)
+
+        output = array.new_string()
+
+        for x=0 to array.size(alert_bool)-1
+
+            if array.get(alert_bool,x)
+
+                array.push(output,array.get(str_vals,x))
+
+        alert(array.join(output,'\n'),alert.freq_once_per_bar_close)
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Premium & Discount {
+
+var hi       = line.new(na,na,na,na,color=bear2)
+
+var lo       = line.new(na,na,na,na,color=bull2)
+
+var fill     = linefill.new(hi,lo,na)
+
+var premium  = box.new(na,na,na,na,na,bgcolor=prem)
+
+var discount = box.new(na,na,na,na,na,bgcolor=disc)
+
+var mid1      = box.new(na,na,na,na,na,bgcolor=color.new(color.gray,80))
+
+
+
+PremiumTop   = Up-(Up-Dn)*.1
+
+PremiumBot   = Up-(Up-Dn)*.25
+
+DiscountTop  = Dn+(Up-Dn)*.25
+
+DiscountBot  = Dn+(Up-Dn)*.1
+
+MidTop       = Up-(Up-Dn)*.45
+
+MidBot       = Dn+(Up-Dn)*.45
+
+
+
+if barstate.islast and showPD
+
+    loc = hlloc=="Left"?math.min(iUp,iDn):math.max(iUp,iDn)
+
+    //High & Low
+
+    line.set_xy1(hi,loc,Up)
+
+    line.set_xy2(hi,b,Up)
+
+    line.set_xy1(lo,loc,Dn)
+
+    line.set_xy2(lo,b,Dn)
+
+    linefill.set_color(fill,color.new(color.gray,90))
+
+    //Premium & Mid & Discount
+
+    box.set_lefttop(premium,loc,PremiumTop)
+
+    box.set_rightbottom(premium,b,PremiumBot)
+
+    box.set_lefttop(discount,loc,DiscountTop)
+
+    box.set_rightbottom(discount,b,DiscountBot)
+
+    box.set_lefttop(mid1,loc,MidTop)
+
+    box.set_rightbottom(mid1,b,MidBot)
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Probability {
+
+var prob1 = label.new(na,na,na,color=color(na),textcolor=chart.fg_color,style=label.style_label_left)
+
+var prob2 = label.new(na,na,na,color=color(na),textcolor=chart.fg_color,style=label.style_label_left)
+
+
+
+if barstate.islast
+
+    str1 = pos<0?array.get(txt,0):array.get(txt,1)
+
+    str2 = pos>0?array.get(txt,0):array.get(txt,1)
+
+    label.set_xy(prob1,b,Up)
+
+    label.set_text(prob1,str1)
+
+    label.set_xy(prob2,b,Dn)
+
+    label.set_text(prob2,str2)
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+// ~~ Table {
+
+if barstate.islast
+
+    //Calulate WinRatio
+
+    W  = matrix.get(vals,8,2)
+
+    L  = matrix.get(vals,8,3)
+
+    WR = math.round(W/(W+L)*100,2)
+
+    string [] tbl_vals = array.from("WIN: "+str.tostring(W),
+
+     "LOSS: "+str.tostring(L),
+
+     "Profitability: "+str.tostring(WR,format.percent))
+
+    color [] tbl_col = array.from(color.green,color.red,chart.fg_color)
+
+    for i=0 to 2
+
+        table.cell(matrix.get(tbl,0,0),0,i,array.get(tbl_vals,i),
+
+         text_halign=text.align_center,bgcolor=chart.bg_color,
+
+         text_color=array.get(tbl_col,i),text_size=size.auto)
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+
+
+
+
+
+
+
+
+
+
+
+source = input.source(ohlc4, title='Source', group='Source')
+
+High_period = input.int(30, title='High Period', group='Fearzone Settings')
+
+Stdev_period = input.int(50, title='Stdev Period', group='Fearzone Settings')
+
+
+
+WMA = input.bool(true, title='Use WMA instead of SMA?', group='Average Type')
+
+
+
+
+
+// Condition One 
+
+FZ1 = (ta.highest(source, High_period) - source) / ta.highest(source, High_period)
+
+AVG1 = ta.sma(FZ1, Stdev_period)
+
+
+
+if WMA
+
+    AVG1 := ta.wma(FZ1, Stdev_period)
+
+    AVG1
+
+
+
+STDEV1 = ta.stdev(FZ1, Stdev_period)
+
+FZ1Limit = AVG1 + STDEV1
+
+
+
+
+
+// Condition Two
+
+FZ2 = ta.sma(source, High_period)
+
+AVG2 = ta.sma(FZ2, Stdev_period)
+
+
+
+if WMA
+
+    FZ2 := ta.wma(source, High_period)
+
+    AVG2 := ta.wma(FZ2, Stdev_period)
+
+    AVG2
+
+
+
+
+
+STDEV2 = ta.stdev(FZ2, Stdev_period)
+
+FZ2Limit = AVG2 - STDEV2
+
+
+
+
+
+
+
+// FearZone
+
+Fearzone_Con = FZ1 > FZ1Limit and FZ2 < FZ2Limit
+
+FearZoneOpen = Fearzone_Con ? low - ta.tr : na
+
+FearZoneClose = Fearzone_Con ? low - 2 * ta.tr : na
+
+plotcandle(FearZoneOpen, FearZoneOpen, FearZoneClose, FearZoneClose, color=#FC6C85, bordercolor=color.red, title='FearZone Candlesticks')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+source2 = input.source(ohlc4, title='Source', group='Source')
+
+Low_period = input.int(30, title='Low Period', group='GreedZone Settings')
+
+Stdev_period2 = input.int(50, title='Stdev Period', group='GreedZone Settings')
+
+
+
+WMA2 = input.bool(false, title='Use WMA2 instead of SMA?', group='Average Type')
+
+
+
+
+
+// Condition One 
+
+FZ12 = (ta.lowest(source2, Low_period) - source2) / ta.lowest(source2, Low_period)
+
+AVG12 = ta.sma(FZ12, Stdev_period2)
+
+
+
+if WMA2
+
+    AVG12 := ta.wma(FZ12, Stdev_period2)
+
+    AVG12
+
+
+
+STDEV12222 = ta.stdev(FZ12, Stdev_period2)
+
+FZ12Limit = AVG12 - STDEV12222
+
+
+
+
+
+// Condition Two
+
+FZ222 = ta.sma(source2, Low_period)
+
+AVG22 = ta.sma(FZ222, Stdev_period2)
+
+
+
+if WMA2
+
+    FZ222 := ta.wma(source2, Low_period)
+
+    AVG22 := ta.wma(FZ222, Stdev_period2)
+
+    AVG22
+
+
+
+
+
+STDEV22 = ta.stdev(FZ222, Stdev_period2)
+
+FZ222Limit = AVG22 + STDEV22
+
+
+
+
+
+// GreedZone
+
+Greedzone_Con = FZ12 < FZ12Limit and FZ222 > FZ222Limit
+
+GreedZoneOpen = Greedzone_Con ? low + ta.tr : na
+
+GreedZoneClose = Greedzone_Con ? low + 2 * ta.tr : na
+
+
+
+plotcandle(GreedZoneOpen, GreedZoneOpen, GreedZoneClose, GreedZoneClose, color=#90EE90, bordercolor=color.green, title='GreedZone Candlesticks')
+
+
+
+
+
+// Alerts
+
+AlertCircle = input.bool(true, title='Show Alert Circle?', group='Alerts')
+
+Alert_Col = Greedzone_Con != Greedzone_Con[1] and AlertCircle ? #90EE90 : na
+
+plotshape(Greedzone_Con, style=shape.circle, location=location.abovebar, size=size.tiny, color=Alert_Col, title='Alert Circle')
+
+alertcondition(Greedzone_Con != Greedzone_Con[1], title='GreedZone', message='GreedZone')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Add these lines at the end of the script
+
+var box[] bullish_boxes = array.new_box(0)
+
+var box[] bearish_boxes = array.new_box(0)
+
+
+
+if (bullCond)
+
+    array.push(bullish_boxes, box.new(bar_index - lbR, high[lbR], bar_index, low[lbR], bgcolor=color.new(color.green, 70)))
+
+
+
+if (bearCond)
+
+    array.push(bearish_boxes, box.new(bar_index - lbR, high[lbR], bar_index, low[lbR], bgcolor=color.new(color.red, 70)))
+
+
+
+int i = 0
+
+while (i < array.size(bullish_boxes))
+
+    b = array.get(bullish_boxes, i)
+
+    if (not na(close[1]) and close[1] < box.get_bottom(b))
+
+        box.set_right(b, bar_index - 1)
+
+        array.remove(bullish_boxes, i)
+
+    else
+
+        box.set_right(b, bar_index)
+
+        i := i + 1
+
+
+
+i := 0
+
+while (i < array.size(bearish_boxes))
+
+    b = array.get(bearish_boxes, i)
+
+    if (not na(close[1]) and close[1] > box.get_top(b))
+
+        box.set_right(b, bar_index - 1)
+
+        array.remove(bearish_boxes, i)
+
+    else
+
+        box.set_right(b, bar_index)
+
+        i := i + 1
